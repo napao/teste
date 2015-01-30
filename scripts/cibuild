@@ -1,0 +1,41 @@
+#!/usr/bin/env node
+var cp = require('./utils/child-process-wrapper.js');
+var fs = require('fs');
+var path = require('path');
+
+process.chdir(path.dirname(__dirname));
+
+// clean .popcorntime cache (npm and other things)
+cp.safeExec.bind(global, 'node scripts/clean', function(error) {
+
+    if (error) {
+        process.exit(1);
+    }
+
+    // make sure we have npm installed
+    cp.safeExec.bind(global, 'npm install npm', {cwd: path.resolve(__dirname, '..', 'build')}, function() {
+
+        // bootstrap the app
+        cp.safeExec.bind(global, 'node scripts/bootstrap --no-quiet', function(error) {
+
+            if (error) {
+                process.exit(1);
+            }
+
+            var gruntPath = path.join('build', 'node_modules', '.bin', 'grunt') + (process.platform === 'win32' ? '.cmd' : '');
+
+            var tasks = [
+              cp.safeExec.bind(global, 'git clean -dff'),
+              cp.safeExec.bind(global, gruntPath + ' ci --gruntfile build/Gruntfile.js --stack --no-color'),
+            ];
+
+            var async = require('async');
+            async.series(tasks, function(error) {
+              process.exit(error ? 1 : 0);
+            });
+
+        })();
+
+    })();
+
+})();
